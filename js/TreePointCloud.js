@@ -16,15 +16,18 @@ export class TreePointCloud {
     }
 
     generateTree() {
-        // Generate trunk
+        // 1. Generate Trunk Points:
         this.generateTrunkPoints();
-        
-        // Generate branches for each level
+
+        // 2. Generate Branches and Foliage:
         for (let level = 1; level <= this.params.branchLevels; level++) {
-            this.generateBranchPoints(level);
+            // Create branches at this level
+            const branchAngle = (Math.random() - 0.5) * Math.PI / 4; // Random angle for each branch
+            const branchDirection = new THREE.Vector3(Math.cos(branchAngle), 0, Math.sin(branchAngle));
+            this.generateBranchPoints(level, branchDirection); 
         }
     }
-
+    
     generateTrunkPoints() {
         const geometry = new THREE.BufferGeometry();
         const positions = [];
@@ -61,7 +64,7 @@ export class TreePointCloud {
         this.points.add(points);
     }
 
-    generateBranchPoints(level) {
+    generateBranchPoints(level, branchDirection) {
         const geometry = new THREE.BufferGeometry();
         const positions = [];
         const colors = [];
@@ -72,20 +75,28 @@ export class TreePointCloud {
         const levelHeight = startHeight + (heightRange * (level / this.params.branchLevels));
 
         for (let i = 0; i < pointCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const heightVariation = (Math.random() - 0.5) * heightRange * 0.2;
-            const radius = this.params.radiusBase * 2 * (level / this.params.branchLevels);
+            // 1. Branch Point Placement:
+            const angle = Math.random() * Math.PI * 2; 
+            const branchRadius = this.params.radiusBase * (1 - level / this.params.branchLevels) * 2; // Taper branches
+            const branchPoint = new THREE.Vector3(
+                branchRadius * Math.cos(angle),
+                levelHeight + (Math.random() - 0.5) * heightRange * 0.1, // Vertical variation
+                branchRadius * Math.sin(angle)
+            );
 
-            // Create sphere-like distribution
-            const phi = Math.acos(2 * Math.random() - 1);
-            const theta = Math.random() * Math.PI * 2;
+            // 2. Rotate Around Trunk:
+            branchPoint.applyAxisAngle(new THREE.Vector3(0, 1, 0), branchDirection.z);
 
-            const x = radius * Math.sin(phi) * Math.cos(theta);
-            const y = levelHeight + heightVariation;
-            const z = radius * Math.sin(phi) * Math.sin(theta);
+            // 3. Foliage Clustering:
+            const foliageRadius = 0.2 * (this.params.branchLevels - level + 1); // Adjust for desired size
+            const foliageOffset = new THREE.Vector3(
+                (Math.random() - 0.5) * foliageRadius,
+                (Math.random() - 0.5) * foliageRadius,
+                (Math.random() - 0.5) * foliageRadius
+            );
+            const pointPosition = branchPoint.clone().add(foliageOffset);
 
-            positions.push(x, y, z);
-
+            positions.push(pointPosition.x, pointPosition.y, pointPosition.z);
             // Color variation (greener for leaves)
             const color = this.params.baseColor.clone();
             color.offsetHSL(
