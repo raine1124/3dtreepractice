@@ -16,107 +16,185 @@ export class TreePointCloud {
     }
 
     generateTree() {
-        // 1. Generate Trunk Points:
-        this.generateTrunkPoints();
-
-        // 2. Generate Branches and Foliage:
-        for (let level = 1; level <= this.params.branchLevels; level++) {
-            // Create branches at this level
-            const branchAngle = (Math.random() - 0.5) * Math.PI / 4; // Random angle for each branch
-            const branchDirection = new THREE.Vector3(Math.cos(branchAngle), 0, Math.sin(branchAngle));
-            this.generateBranchPoints(level, branchDirection); 
-        }
-    }
-    
-    generateTrunkPoints() {
-        const geometry = new THREE.BufferGeometry();
-        const positions = [];
-        const colors = [];
-        const pointCount = Math.floor(this.params.pointsPerLevel / 2);
-
-        for (let i = 0; i < pointCount; i++) {
-            const heightPercent = Math.random();
-            const angle = Math.random() * Math.PI * 2;
-            const radius = this.params.radiusBase * (1 - heightPercent * 0.7);
-
-            const x = Math.cos(angle) * radius;
-            const y = heightPercent * this.params.height * 0.4;
-            const z = Math.sin(angle) * radius;
-
-            positions.push(x, y, z);
-
-            // Color variation for trunk (darker brown)
-            const color = new THREE.Color(0x4B3621);
-            color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
-            colors.push(color.r, color.g, color.b);
-        }
-
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-        const material = new THREE.PointsMaterial({
-            size: this.params.boundarySize * 0.002,
-            vertexColors: true,
-            sizeAttenuation: true
-        });
-
-        const points = new THREE.Points(geometry, material);
-        this.points.add(points);
+        this.createTrunk();
+        this.createBranches();
+        this.createLeaves();
     }
 
-    generateBranchPoints(level, branchDirection) {
-        const geometry = new THREE.BufferGeometry();
-        const positions = [];
-        const colors = [];
-        const pointCount = this.params.pointsPerLevel;
+    createTrunk() {
+        const trunkGeometry = new THREE.BufferGeometry();
+        const trunkPositions = [];
+        const trunkColors = [];
 
-        const startHeight = this.params.height * 0.3;
-        const heightRange = this.params.height - startHeight;
-        const levelHeight = startHeight + (heightRange * (level / this.params.branchLevels));
+        const trunkSegments = 20; 
+        const trunkRadiusVariation = 0.2;
 
-        for (let i = 0; i < pointCount; i++) {
-            // 1. Branch Point Placement:
-            const angle = Math.random() * Math.PI * 2; 
-            const branchRadius = this.params.radiusBase * (1 - level / this.params.branchLevels) * 2; // Taper branches
-            const branchPoint = new THREE.Vector3(
-                branchRadius * Math.cos(angle),
-                levelHeight + (Math.random() - 0.5) * heightRange * 0.1, // Vertical variation
-                branchRadius * Math.sin(angle)
-            );
+        for (let segment = 0; segment < trunkSegments; segment++) {
+            const segmentHeight = segment / trunkSegments;
+            const segmentRadius = this.params.radiusBase * (1 - segmentHeight * 0.7)
+                                 * (1 + (Math.random() - 0.5) * trunkRadiusVariation); 
 
-            // 2. Rotate Around Trunk:
-            branchPoint.applyAxisAngle(new THREE.Vector3(0, 1, 0), branchDirection.z);
+            for (let i = 0; i < this.params.pointsPerLevel; i++) {
+                const angle = (i / this.params.pointsPerLevel) * Math.PI * 2;
+                const x = segmentRadius * Math.cos(angle) + (Math.random() - 0.5) * 0.1; 
+                const y = segmentHeight * this.params.height;
+                const z = segmentRadius * Math.sin(angle) + (Math.random() - 0.5) * 0.1; 
 
-            // 3. Foliage Clustering:
-            const foliageRadius = 0.2 * (this.params.branchLevels - level + 1); // Adjust for desired size
-            const foliageOffset = new THREE.Vector3(
-                (Math.random() - 0.5) * foliageRadius,
-                (Math.random() - 0.5) * foliageRadius,
-                (Math.random() - 0.5) * foliageRadius
-            );
-            const pointPosition = branchPoint.clone().add(foliageOffset);
+                trunkPositions.push(x, y, z);
 
-            positions.push(pointPosition.x, pointPosition.y, pointPosition.z);
-            // Color variation (greener for leaves)
-            const color = this.params.baseColor.clone();
-            color.offsetHSL(
-                (Math.random() - 0.5) * this.params.colorVariation,
-                (Math.random() - 0.5) * this.params.colorVariation,
-                (Math.random() - 0.5) * this.params.colorVariation
-            );
-            colors.push(color.r, color.g, color.b);
+                const color = new THREE.Color(0x4B3621); 
+                color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+                trunkColors.push(color.r, color.g, color.b);
+            }
         }
 
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        trunkGeometry.setAttribute('position', new THREE.Float32BufferAttribute(trunkPositions, 3));
+        trunkGeometry.setAttribute('color', new THREE.Float32BufferAttribute(trunkColors, 3));
 
-        const material = new THREE.PointsMaterial({
+        const trunkMaterial = new THREE.PointsMaterial({
             size: 0.03,
             vertexColors: true
         });
 
-        const points = new THREE.Points(geometry, material);
-        this.points.add(points);
+        const trunkPoints = new THREE.Points(trunkGeometry, trunkMaterial);
+        this.points.add(trunkPoints);
+    }
+
+    createBranches() {
+        const branchGeometry = new THREE.BufferGeometry();
+        const branchPositions = [];
+        const branchColors = [];
+
+        const numBranches = this.params.branchLevels * this.params.pointsPerLevel;
+        const branchRadiusVariation = 0.15; 
+
+        for (let i = 0; i < numBranches; i++) {
+            // 1. Branching Point on Trunk
+            const trunkHeight = Math.random(); // Position on trunk (0 = bottom, 1 = top)
+            const trunkRadius = this.params.radiusBase * (1 - trunkHeight * 0.7); 
+            const branchAngle = Math.random() * Math.PI * 2; // Angle around the trunk
+            const branchStartX = trunkRadius * Math.cos(branchAngle);
+            const branchStartY = trunkHeight * this.params.height; 
+            const branchStartZ = trunkRadius * Math.sin(branchAngle);
+
+            // 2. Branch Length and Direction 
+            const branchLength = (1 - trunkHeight) * this.params.height * 0.5 * (Math.random() + 0.5); // Shorter at top
+            const branchDirectionX = Math.random() - 0.5; 
+            const branchDirectionZ = Math.random() - 0.5;
+            const branchDirectionY = -Math.random();
+
+            // Normalize direction vector (important for consistent branch thickness)
+            const directionMagnitude = Math.sqrt(branchDirectionX * branchDirectionX + 
+                                                branchDirectionY * branchDirectionY + 
+                                                branchDirectionZ * branchDirectionZ);
+            const normalizedX = branchDirectionX / directionMagnitude;
+            const normalizedY = branchDirectionY / directionMagnitude;
+            const normalizedZ = branchDirectionZ / directionMagnitude;
+
+            // 3. Points along Branch
+            const branchSegments = 10;
+            for (let j = 0; j < branchSegments; j++) {
+                const segmentPosition = j / branchSegments; 
+                const segmentRadius = 0.02 * (1 - segmentPosition) *  // Tapering
+                                      (1 + (Math.random() - 0.5) * branchRadiusVariation); 
+
+                const x = branchStartX + normalizedX * branchLength * segmentPosition + 
+                          (Math.random() - 0.5) * 0.05; // Add slight noise for texture
+                const y = branchStartY + normalizedY * branchLength * segmentPosition;
+                const z = branchStartZ + normalizedZ * branchLength * segmentPosition + 
+                          (Math.random() - 0.5) * 0.05;  
+
+                branchPositions.push(x, y, z);
+
+                // Branch Color (similar variation to the trunk)
+                const color = new THREE.Color(0x3D2B1F); 
+                color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.15); 
+                branchColors.push(color.r, color.g, color.b);
+            }
+        }
+
+        branchGeometry.setAttribute('position', new THREE.Float32BufferAttribute(branchPositions, 3));
+        branchGeometry.setAttribute('color', new THREE.Float32BufferAttribute(branchColors, 3));
+
+        const branchMaterial = new THREE.PointsMaterial({
+            size: 0.02,
+            vertexColors: true 
+        });
+
+        const branchPoints = new THREE.Points(branchGeometry, branchMaterial);
+        this.points.add(branchPoints); 
+    }
+
+    createLeaves() { 
+        const leafGeometry = new THREE.BufferGeometry();
+        const leafPositions = [];
+        const leafColors = [];
+
+        const numLeafClusters = this.params.branchLevels * this.params.pointsPerLevel / 2; 
+
+        for (let i = 0; i < numLeafClusters; i++) {
+            // 1. Random Point on a Branch (reusing some branch logic)
+            const trunkHeight = Math.random(); 
+            const trunkRadius = this.params.radiusBase * (1 - trunkHeight * 0.7);
+            const branchAngle = Math.random() * Math.PI * 2; 
+            const branchStartX = trunkRadius * Math.cos(branchAngle);
+            const branchStartY = trunkHeight * this.params.height;
+            const branchStartZ = trunkRadius * Math.sin(branchAngle);
+
+            const branchLength = (1 - trunkHeight) * this.params.height * 0.5 * (Math.random() + 0.5); 
+            const branchDirectionX = Math.random() - 0.5;
+            const branchDirectionZ = Math.random() - 0.5;
+            const branchDirectionY = -Math.random() * 0.5; 
+
+            const directionMagnitude = Math.sqrt(branchDirectionX * branchDirectionX +
+                branchDirectionY * branchDirectionY +
+                branchDirectionZ * branchDirectionZ);
+            const normalizedX = branchDirectionX / directionMagnitude;
+            const normalizedY = branchDirectionY / directionMagnitude;
+            const normalizedZ = branchDirectionZ / directionMagnitude;
+
+
+            const leafClusterPosition = Math.random(); 
+
+            const clusterCenterX = branchStartX + normalizedX * branchLength * leafClusterPosition;
+            const clusterCenterY = branchStartY + normalizedY * branchLength * leafClusterPosition;
+            const clusterCenterZ = branchStartZ + normalizedZ * branchLength * leafClusterPosition;
+
+            // 2. Leaf Points around Cluster Center 
+            const clusterRadius = Math.random() * 0.3 + 0.1; // Vary cluster size
+            const pointsPerCluster = 20; 
+
+            for (let j = 0; j < pointsPerCluster; j++) {
+                const leafAngle = Math.random() * Math.PI * 2;
+                const leafDistance = Math.random() * clusterRadius;
+
+                const x = clusterCenterX + leafDistance * Math.cos(leafAngle) + (Math.random() - 0.5) * 0.1;
+                const y = clusterCenterY + leafDistance * Math.sin(leafAngle) + (Math.random() - 0.5) * 0.1;
+                const z = clusterCenterZ + (Math.random() - 0.5) * 0.1; 
+
+                leafPositions.push(x, y, z);
+
+                // 3. Leaf Color Variation 
+                const color = new THREE.Color(this.params.baseColor); 
+                color.offsetHSL(
+                    (Math.random() - 0.5) * this.params.colorVariation * 0.5, // Less hue variation
+                    (Math.random() - 0.5) * this.params.colorVariation,
+                    (Math.random() - 0.5) * this.params.colorVariation * 0.3 // Less lightness variation
+                );
+                leafColors.push(color.r, color.g, color.b);
+            }
+        }
+
+        leafGeometry.setAttribute('position', new THREE.Float32BufferAttribute(leafPositions, 3));
+        leafGeometry.setAttribute('color', new THREE.Float32BufferAttribute(leafColors, 3));
+
+        const leafMaterial = new THREE.PointsMaterial({
+            size: 0.05,
+            vertexColors: true 
+        });
+
+        const leafPoints = new THREE.Points(leafGeometry, leafMaterial);
+        this.points.add(leafPoints);
     }
 
     getPoints() {
